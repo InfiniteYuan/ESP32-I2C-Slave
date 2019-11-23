@@ -25,9 +25,9 @@ GPATH
 examples/**/sdkconfig
 examples/**/sdkconfig.old
 examples/**/build
-/build
 /sdkconfig
 /sdkconfig.old
+/build
 
 # Doc build artifacts
 docs/*/_build/
