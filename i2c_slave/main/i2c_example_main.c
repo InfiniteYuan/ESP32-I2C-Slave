@@ -31,20 +31,25 @@ static const char *TAG = "i2c-example";
 #define RW_TEST_LENGTH 128               /*!< Data length for r/w test, [0,DATA_LENGTH] */
 #define DELAY_TIME_BETWEEN_ITEMS_MS 1000 /*!< delay time between different test items */
 
-#define I2C_SLAVE_SCL_IO 5               /*!< gpio number for i2c slave clock */
-#define I2C_SLAVE_SDA_IO 4               /*!< gpio number for i2c slave data */
-#define I2C_SLAVE_NUM I2C_NUMBER(CONFIG_I2C_SLAVE_PORT_NUM) /*!< I2C port number for slave dev */
-#define I2C_SLAVE_TX_BUF_LEN (2 * DATA_LENGTH)              /*!< I2C slave tx buffer size */
-#define I2C_SLAVE_RX_BUF_LEN (2 * DATA_LENGTH)              /*!< I2C slave rx buffer size */
-
-#define I2C_MASTER_SCL_IO 5               /*!< gpio number for I2C master clock */
-#define I2C_MASTER_SDA_IO 4               /*!< gpio number for I2C master data  */
-#define I2C_MASTER_NUM I2C_NUMBER(CONFIG_I2C_MASTER_PORT_NUM) /*!< I2C port number for master dev */
-#define I2C_MASTER_FREQ_HZ 100000        /*!< I2C master clock frequency */
-#define I2C_MASTER_TX_BUF_DISABLE 0                           /*!< I2C master doesn't need buffer */
-#define I2C_MASTER_RX_BUF_DISABLE 0                           /*!< I2C master doesn't need buffer */
-
 #define ESP_SLAVE_ADDR CONFIG_I2C_SLAVE_ADDRESS /*!< ESP32 slave address, you can set any 7bit value */
+
+#ifdef CONFIG_EXAMPLE_I2C_SLAVE
+    #define I2C_SLAVE_SCL_IO CONFIG_I2C_SLAVE_SCL               /*!< gpio number for i2c slave clock */
+    #define I2C_SLAVE_SDA_IO CONFIG_I2C_SLAVE_SDA               /*!< gpio number for i2c slave data */
+    #define I2C_SLAVE_NUM I2C_NUMBER(CONFIG_I2C_SLAVE_PORT_NUM) /*!< I2C port number for slave dev */
+    #define I2C_SLAVE_TX_BUF_LEN (2 * DATA_LENGTH)              /*!< I2C slave tx buffer size */
+    #define I2C_SLAVE_RX_BUF_LEN (2 * DATA_LENGTH)              /*!< I2C slave rx buffer size */
+#endif
+
+#ifdef CONFIG_EXAMPLE_I2C_MASTER
+    #define I2C_MASTER_SCL_IO CONFIG_I2C_MASTER_SCL               /*!< gpio number for I2C master clock */
+    #define I2C_MASTER_SDA_IO CONFIG_I2C_MASTER_SDA               /*!< gpio number for I2C master data  */
+    #define I2C_MASTER_NUM I2C_NUMBER(CONFIG_I2C_MASTER_PORT_NUM) /*!< I2C port number for master dev */
+    #define I2C_MASTER_FREQ_HZ 100000        /*!< I2C master clock frequency */
+    #define I2C_MASTER_TX_BUF_DISABLE 0                           /*!< I2C master doesn't need buffer */
+    #define I2C_MASTER_RX_BUF_DISABLE 0                           /*!< I2C master doesn't need buffer */
+#endif
+
 #define WRITE_BIT I2C_MASTER_WRITE              /*!< I2C master write */
 #define READ_BIT I2C_MASTER_READ                /*!< I2C master read */
 #define ACK_CHECK_EN 0x1                        /*!< I2C master will check ack from slave*/
@@ -101,7 +106,7 @@ static esp_err_t i2c_master_read_slave(i2c_port_t i2c_num, uint8_t reg_addr, uin
     i2c_cmd_link_delete(cmd);
     return ret;
 }
-
+#ifdef CONFIG_EXAMPLE_I2C_MASTER
 /**
  * @brief i2c master initialization
  */
@@ -120,6 +125,9 @@ static esp_err_t i2c_master_init()
                               I2C_MASTER_RX_BUF_DISABLE,
                               I2C_MASTER_TX_BUF_DISABLE, 0);
 }
+#endif
+
+#ifdef CONFIG_EXAMPLE_I2C_SLAVE
 typedef enum {
     SLAVE_WRITE = 0,
     SLAVE_READ = 1,
@@ -262,7 +270,7 @@ static esp_err_t i2c_slave_init()
     
     return ESP_OK;
 }
-
+#endif
 /**
  * @brief test function to show buffer
  */
@@ -278,6 +286,7 @@ static void disp_buf(uint8_t *buf, int len)
     printf("\n");
 }
 
+#ifdef CONFIG_EXAMPLE_I2C_MASTER
 static void i2c_master_task(void *arg)
 {
     int i = 0;
@@ -307,30 +316,14 @@ static void i2c_master_task(void *arg)
     }
     vTaskDelete(NULL);
 }
-
-static void i2c_slave_task_recv(void *arg)
-{
-	int size =3;
-	uint8_t data[128];
-	while(1)
-	{
-		do {
-			size = i2c_slave_read_buffer(I2C_SLAVE_NUM, data, 128, 50 / portTICK_PERIOD_MS/*portMAX_DELAY*/);//接收俩个字节数据这样不可以（接受时间不可太长）
-		} while (size == 0);
-		if (size == 1) {	//有可能是读取操作
-    
-		} else if (size > 1) {	// 写操作肯定是大于1的
-			printf("size = %d\r\n",size-1);//因为第一个字节为寄存器地址
-		}
-	}
-}
+#endif
 
 void app_main()
 {
-
+#if CONFIG_EXAMPLE_I2C_MASTER
     ESP_ERROR_CHECK(i2c_master_init());
-    xTaskCreate(i2c_master_task, "i2c_master_task1", 1024 * 2, (void *)0, 10, NULL);
-    
-    // ESP_ERROR_CHECK(i2c_slave_init());
-    // xTaskCreate(i2c_slave_task_recv, "i2c_slave_task3", 1024 * 2, (void *)1, 10, NULL);//从端口接收写入EEPROM
+    xTaskCreate(i2c_master_task, "i2c_master_task", 1024 * 2, (void *)0, 10, NULL);
+#else
+    ESP_ERROR_CHECK(i2c_slave_init());
+#endif
 }
